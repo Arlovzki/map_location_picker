@@ -273,6 +273,9 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
   /// Search text field controller
   late TextEditingController _searchController = TextEditingController();
 
+  /// Identifies if the camera is animating.
+  bool isAnimating = false;
+
   @override
   Widget build(BuildContext context) {
     final additionalMarkers = widget.additionalMarkers?.entries
@@ -385,8 +388,10 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
                       placesDetails.result.geometry?.location.lng ?? 0,
                     );
                     final controller = await _controller.future;
-                    controller.animateCamera(
+                    isAnimating = true;
+                    await controller.animateCamera(
                         CameraUpdate.newCameraPosition(cameraPosition()));
+                    isAnimating = false;
                     _address = placesDetails.result.formattedAddress ?? "";
                     widget.onSuggestionSelected?.call(placesDetails);
 
@@ -462,11 +467,13 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
                               LatLng(position.latitude, position.longitude);
                           _initialPosition = latLng;
                           final controller = await _controller.future;
-                          controller.animateCamera(
+                          isAnimating = true;
+                          await controller.animateCamera(
                             CameraUpdate.newCameraPosition(
                               cameraPosition(),
                             ),
                           );
+                          isAnimating = false;
                           _decodeAddress(
                             Location(
                               lat: position.latitude,
@@ -504,12 +511,14 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   child: RoundedElevatedButton(
                     child: Text('Confirm'),
-                    onPressed: () {
-                      widget.onNext?.call(_geoDataResult);
-                      if (widget.popOnNextButtonTaped) {
-                        Navigator.pop(context, _geoDataResult);
-                      }
-                    },
+                    onPressed: isAnimating
+                        ? null
+                        : () async {
+                            widget.onNext?.call(_geoDataResult);
+                            if (widget.popOnNextButtonTaped) {
+                              Navigator.pop(context, _geoDataResult);
+                            }
+                          },
                   ),
                 ),
               ],
