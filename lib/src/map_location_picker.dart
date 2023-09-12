@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:geocoder2/geocoder2.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import "package:google_maps_webapi/geocoding.dart";
@@ -12,6 +11,7 @@ import 'package:map_location_picker/src/widgets/rounded_elevated_button.dart';
 
 import 'autocomplete_view.dart';
 import 'logger.dart';
+import 'models/picked_address.dart';
 
 class MapLocationPicker extends StatefulWidget {
   /// Padding around the map
@@ -81,10 +81,10 @@ class MapLocationPicker extends StatefulWidget {
   final Function(PlacesDetailsResponse?)? onSuggestionSelected;
 
   /// On Next Page callback
-  final Function(GeoData?)? onNext;
+  final Function(PickedAddress?)? onNext;
 
   /// When tap on map decode address callback function
-  final Function(GeocodingResult?)? onDecodeAddress;
+  final Function(PickedAddress?)? onDecodeAddress;
 
   /// Show back button (default: true)
   final bool hideBackButton;
@@ -268,7 +268,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
   late double _zoom = 18.0;
 
   /// GeoCoding data result for further use
-  GeoData? _geoDataResult;
+  PickedAddress? _pickedAddress;
 
   /// Search text field controller
   late TextEditingController _searchController = TextEditingController();
@@ -393,8 +393,16 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
                         CameraUpdate.newCameraPosition(cameraPosition()));
                     isAnimating = false;
                     _address = placesDetails.result.formattedAddress ?? "";
-                    widget.onSuggestionSelected?.call(placesDetails);
 
+                    widget.onSuggestionSelected?.call(placesDetails);
+                    final placeGeometry = placesDetails.result.geometry;
+
+                    _decodeAddress(
+                      Location(
+                        lat: placeGeometry!.location.lat,
+                        lng: placeGeometry.location.lng,
+                      ),
+                    );
                     setState(() {});
                   },
                 ),
@@ -514,9 +522,9 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
                     onPressed: isAnimating
                         ? null
                         : () async {
-                            widget.onNext?.call(_geoDataResult);
+                            widget.onNext?.call(_pickedAddress);
                             if (widget.popOnNextButtonTaped) {
-                              Navigator.pop(context, _geoDataResult);
+                              Navigator.pop(context, _pickedAddress);
                             }
                           },
                   ),
@@ -556,13 +564,43 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
   /// Decode address from latitude & longitude
   void _decodeAddress(Location location) async {
     try {
-      GeoData data = await Geocoder2.getDataFromCoordinates(
-          latitude: location.lat,
-          longitude: location.lng,
-          googleMapApiKey: widget.apiKey);
+      final geocoding = GoogleMapsGeocoding(
+        apiKey: widget.apiKey,
+        baseUrl: widget.geoCodingBaseUrl,
+        apiHeaders: widget.geoCodingApiHeaders,
+        httpClient: widget.geoCodingHttpClient,
+      );
+      final response = await geocoding.searchByLocation(
+        location,
+        language: widget.language,
+        locationType: widget.locationType,
+        resultType: widget.resultType,
+      );
 
-      _address = data.address;
-      _geoDataResult = data;
+      /// When get any error from the API, show the error in the console.
+      if (response.hasNoResults ||
+          response.isDenied ||
+          response.isInvalid ||
+          response.isNotFound ||
+          response.unknownError ||
+          response.isOverQueryLimit) {
+        logger.e(response.errorMessage);
+        _address = response.status;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response.errorMessage ??
+                  "Address not found, something went wrong!"),
+            ),
+          );
+        }
+        return;
+      }
+
+      final geocodingResult = response.results.first;
+      _pickedAddress = PickedAddress.fromGeocodingResult(geocodingResult);
+      _address = _pickedAddress?.addressLine ?? "";
+      widget.onDecodeAddress?.call(_pickedAddress);
 
       setState(() {});
     } catch (e) {

@@ -1,8 +1,48 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:map_location_picker/map_location_picker.dart';
 
 void main() {
+  Completer<AndroidMapRenderer?>? initializedRendererCompleter;
+
+  /// Initializes map renderer to the `latest` renderer type for Android platform.
+  ///
+  /// The renderer must be requested before creating GoogleMap instances,
+  /// as the renderer can be initialized only once per application context.
+  Future<AndroidMapRenderer?> initializeMapRenderer() async {
+    if (initializedRendererCompleter != null) {
+      return initializedRendererCompleter!.future;
+    }
+
+    final Completer<AndroidMapRenderer?> completer =
+        Completer<AndroidMapRenderer?>();
+    initializedRendererCompleter = completer;
+
+    WidgetsFlutterBinding.ensureInitialized();
+
+    final GoogleMapsFlutterPlatform mapsImplementation =
+        GoogleMapsFlutterPlatform.instance;
+    if (mapsImplementation is GoogleMapsFlutterAndroid) {
+      unawaited(mapsImplementation
+          .initializeWithRenderer(AndroidMapRenderer.latest)
+          .then((AndroidMapRenderer initializedRenderer) =>
+              completer.complete(initializedRenderer)));
+    } else {
+      completer.complete(null);
+    }
+
+    return completer.future;
+  }
+
+  final GoogleMapsFlutterPlatform mapsImplementation =
+      GoogleMapsFlutterPlatform.instance;
+  if (mapsImplementation is GoogleMapsFlutterAndroid) {
+    mapsImplementation.useAndroidViewSurface = true;
+    initializeMapRenderer();
+  }
+
   runApp(
     const MaterialApp(
       home: MyApp(),
@@ -73,11 +113,13 @@ class _MyAppState extends State<MyApp> {
                         hideMapTypeButton: true,
                         hideMoreOptions: true,
                         currentLatLng: const LatLng(14.115286, 120.962112),
-                        onNext: (GeoData? result) {
+                        onNext: (PickedAddress? result) {
                           if (result != null) {
                             setState(() {
-                              address = result.address;
+                              address = result.addressLine!;
                             });
+
+                            print('province: ${result.subAdminArea}');
                           }
                         },
                       );
