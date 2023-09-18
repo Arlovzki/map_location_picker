@@ -107,7 +107,7 @@ class _MyAppState extends State<MyApp> {
                   MaterialPageRoute(
                     builder: (context) {
                       return MapLocationPicker(
-                        apiKey: "",
+                        apiKey: "AIzaSyBcJ6XxGk0HJVUyPKXYCaycwjFMgKOC72Y",
                         popOnNextButtonTaped: true,
                         hideBackButton: true,
                         hideMapTypeButton: true,
@@ -118,8 +118,9 @@ class _MyAppState extends State<MyApp> {
                             setState(() {
                               address = result.addressLine!;
                             });
-
+                            print('admin area: ${result.adminArea}');
                             print('province: ${result.subAdminArea}');
+                            print('city: ${result.locality}');
                           }
                         },
                       );

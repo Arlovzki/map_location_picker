@@ -49,6 +49,11 @@ class PickedAddress {
     }
 
     final country = search('country');
+    final adminArea = search('administrative_area_level_1')?.longName ??
+        search('administrative_area_level_2')?.longName;
+
+    final subAdminArea = search('administrative_area_level_2')?.longName ??
+        search('administrative_area_level_3')?.longName;
 
     return PickedAddress(
       geometry: geocodingResult.geometry,
@@ -58,8 +63,8 @@ class PickedAddress {
       featureName:
           search('featureName')?.longName ?? geocodingResult.formattedAddress,
       postalCode: search('postal_code')?.longName,
-      adminArea: search('administrative_area_level_1')?.longName,
-      subAdminArea: search('administrative_area_level_2')?.longName,
+      adminArea: adminArea,
+      subAdminArea: subAdminArea,
       locality: search('locality')?.longName,
       subLocality:
           (search('sublocality') ?? search('sublocality_level_1'))?.longName,
